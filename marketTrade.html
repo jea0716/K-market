@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src='web3.min.js'></script>
+    <script type="text/javascript" src="abilist.js"></script>
+    <meta charset="utf-8">
+</head>
+<style>
+    div {
+        width: 100%;
+        height: 100%;
+        padding: auto;
+    }
+
+    div.left {
+        width: 40%;
+        float: left;
+        box-sizing: border-box;
+    }
+
+    div.right {
+        width: 60%;
+        float: right;
+        box-sizing: border-box;
+    }
+
+    .button {
+        width: 200px;
+        border-radius: 5px;
+        border: 1px solid black;
+        background-color: rgba(0, 0, 0, 0);
+        color: black;
+        padding: 5px;
+        font-weight: 700;
+    }
+
+    .button:hover {
+        background-color: gray;
+        border: 1px solid white;
+        color: white;
+        font-weight: 700;
+    }
+
+    .text {
+        width: 200px;
+        border: 1px solid black;
+        background-color: rgba(0, 0, 0, 0);
+        padding: 5px;
+        font-weight: 700;
+    }
+</style>
+
+<body>
+    <div>
+        <div class="left">
+            <h3 style="border-bottom: 1px solid #688FF4; padding: 0.1em;"><b>
+                K-MARKET
+            </b></h3>
+            <table>
+                <table style="float: left;" id="sell_name_list">
+                </table>
+                <table style="float: right; padding-right: 30px; " id="sell_price_list">
+                </table>
+            </table>
+        </div>
+    </div>
+    <div>
+        <div class="right" style="float: left; padding-left: 30px; ">
+            <h3> 계정: <span id="account"></span>
+            </h3>
+            <form style="padding-bottom: 20px;">
+                <input class="button" type="button" id="btn_register_address" value="사용자 주소 등록 " />
+            </form>
+            <form style="padding-bottom: 20px;">
+                <input class="button" type="button" id="btn_register_check" value="주소 등록 여부 확인" />
+            </form>
+            <form>
+                <form>
+                    <input class="text" type="text" id="item_name" placeholder="물건 이름" />
+                </form>
+                <form>
+                    <input class="text" type="text" id="item_num" placeholder="물건 개수" />
+                    <input class="button" style="width: 100px;" type="button" id="btn_register_item" value="물건 등록" />
+                </form>
+            </form>
+            <form style="padding-bottom: 20px; padding-top: 20px;">
+                <input class="button" type="button" id="btn_item_check" value="보유중인 물건 확인" />
+            </form>
+            <form>
+                <input class="text" type="text" id="item_name_own" placeholder="보유중인 물건의 이름" />
+            </form>
+            <form style="padding-bottom: 20px;">
+                <input class="button" type="button" id="btn_num_check" value="보유중인 물건의 개수 확인" />
+            </form>
+            <form>
+                <form>
+                    <input class="text" type="text" id="btn_register_item_name" placeholder="등록할 물건 이름" />
+                </form>
+                <form>
+                    <input class="text" type="text" id="btn_register_item_price" placeholder="등록할 물건 가격" />
+                    <input class="button" style="width: 100px;" type='button' id="btn_register_item_to_market" value="거래소 등록" />
+                </form>
+            </form>
+            <form>
+                <h3> 결과: <span id="resultbox"></span>
+                </h3>
+            </form>
+            <form>
+                <input class="button" type='button' id="refresh" value="새로고침" />
+            </form>
+            <a href="https://youtu.be/yRscLFzT1tI">시연동영상</a>
+        </div>
+    </div>
+
+
+
+    <!-- javascript -->
+    <script type="text/javascript">
+
+        // 사용자 계정
+        var accounts;
+        // [[거래등록자계정, 이름, 가격, 상태], [거래등록자계정, 이름, 가격, 상태] ...]
+        var items;
+        let contractInstance;
+        // 생성할 버튼의 이름들(존잿하면 1, 존재히자 읺으면 0)
+        var item_names = {}
+
+        // 첫 화면 접속시 실행됨
+        window.addEventListener('load', async () => {
+            // dapp을 지원하는 브라우저인지 확인
+            // if (window.ethereum) {
+            //     window.alert('Modern dapp browsers');
+            // }
+            // else if (window.web3) {
+            //     alert('Legacy dapp browsers');
+            // }
+            // else {
+            //     alert('Non-Ethereum browser detected. You should consider trying MetaMask!');
+            // }
+
+            // 메타마스크에서 계정들을 가져온다.
+            window.accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+            const showAccount = document.getElementById('account');
+            showAccount.innerHTML = accounts[0];
+
+            // 스마트 컨트랙트
+            var address = "0x951b55378E85b287C720339500CB070032C72C05";
+            window.web3 = new Web3(window.ethereum);
+            contractInstance = await new window.web3.eth.Contract(abi, address);
+
+            // 사용자 계좌(계정) 등록 버튼
+            let btn = document.getElementById("btn_register_address");
+            btn.addEventListener('click', registerClicked);
+
+            // 사용자 계좌 등록 여부 확인
+            btn = document.getElementById("btn_register_check");
+            btn.addEventListener('click', registerCheckClicked);
+
+            // 사용자 계정에 보유중인 물건 확인 버튼
+            btn = document.getElementById("btn_item_check");
+            btn.addEventListener('click', itemCheckClicked);
+
+            // 사용자 계정에 물건 등록 버튼
+            btn = document.getElementById("btn_register_item");
+            btn.addEventListener('click', registerItemClicked);
+
+            // 사용자 계정이 보유중인 물건의 개수 확인 버튼
+            btn = document.getElementById("btn_num_check");
+            btn.addEventListener('click', itemNumberClicked);
+
+            // 사용자가 보유중인 물건을 거래소에 등록하는 버튼
+            btn = document.getElementById("btn_register_item_to_market");
+            btn.addEventListener('click', sellItemClicked);
+
+            // 새로고침 버튼
+            btn = document.getElementById("refresh");
+            btn.addEventListener('click', refreshClicked);
+
+            refreshClicked();
+        });
+
+        // 사용자 계정 등록 여부 확인 버튼
+        async function registerCheckClicked() {
+            const value = await contractInstance.methods.checkRegister().call({from:accounts[0]});
+            if(!value)
+                resultbox.innerHTML = "미등록";
+            else
+                resultbox.innerHTML = "등록됨";
+        }
+
+        // 내가 보유중인 물건 거래소 등록
+        async function sellItemClicked() {
+            const itemName = document.getElementById("btn_register_item_name").value;
+            const itemPrice = document.getElementById("btn_register_item_price").value;
+            console.log(itemPrice);
+            const value = await contractInstance.methods.sellItem(itemName, itemPrice).send({from:accounts[0]});
+            resultbox.innerHTML = value;
+
+            refreshClicked();
+        }
+
+        // 거래소 현황 새로고침
+        async function refreshMarket() {
+            var item_names = {}
+            if (items.length == 0)
+                return;
+
+            const table = document.getElementById("sell_name_list");
+            var tmp = table.rows.length;
+            for(let i = 0; i < tmp; i++)  {
+                table.deleteRow(-1);
+            }
+
+            for(var i=0; i<items.length; i++) {
+                if(!(items[i][1] in item_names)) {
+                    item_names[items[i][1]] = 1;
+                    const newRow = table.insertRow();
+                    const newCell = newRow.insertCell(0);
+                    var btn_table = document.createElement("input");
+                    btn_table.type = "button";
+                    btn_table.value = items[i][1];
+                    btn_table.style = "border: 1px solid black; font-weight: 700; border-radius: 5px; background-color: rgba(0,0,0,0);";
+                    newCell.appendChild(btn_table);
+                    btn_table.addEventListener('click', (event)=> {
+                        // console.log(event.target.value);
+                        const table = document.getElementById("sell_price_list");
+                        var tmp = table.rows.length;
+                        for(let i = 0; i < tmp; i++)  {
+                            table.deleteRow(-1);
+                        }
+
+                        for(var i=0; i<items.length; i++) {
+                            if(items[i][1] == event.target.value && !items[i][3]) {
+                                const newRow = table.insertRow();
+
+                                const new_price = newRow.insertCell(0);
+                                const buy_cell = newRow.insertCell(1);
+                                const del_cell = newRow.insertCell(2);
+
+                                new_price.innerText = items[i][2] + " wei ";
+
+                                var btn_buy = document.createElement("input");
+                                btn_buy.type = "button";
+                                btn_buy.value = "buy";
+                                btn_buy.id = i;
+                                btn_buy.style = "border: 1px solid black; font-weight: 700; border-radius: 5px; background-color: rgba(0,0,0,0);";
+                                buy_cell.appendChild(btn_buy);
+
+                                btn_buy.addEventListener('click', buyClicked);
+
+                                var btn_del = document.createElement("input");
+                                btn_del.type = "button";
+                                btn_del.value = 'cancel';
+                                btn_del.id = i;
+                                btn_del.style = "border: 1px solid black; font-weight: 700; border-radius: 5px; background-color: rgba(0,0,0,0);";
+                                if(items[i][0].toLowerCase() != accounts[0].toLowerCase())
+                                    btn_del.disabled = true;
+                                // else
+                                //     btn_del.disabled = false;
+                                del_cell.appendChild(btn_del);
+                                btn_del.addEventListener('click', cancelClick);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        // 판매 취소 버튼
+        async function cancelClick() {
+            console.log(event.target.id);
+            const value = await contractInstance.methods.cancelItem(event.target.id).send({from:accounts[0]});
+            resultbox.innerHTML = "취소완료";
+
+            refreshClicked();
+        }
+
+        // 구매버튼
+        async function buyClicked() {
+            console.log(event.target.id);
+            var price = items[event.target.id][2];
+            const value = await contractInstance.methods.buyItem(event.target.id).send({from:accounts[0],
+            value: price});
+            resultbox.innerHTML = "구매완료";
+
+            refreshClicked();
+        }
+
+        // 새로고침 버튼
+        async function refreshClicked() {
+            const value = await contractInstance.methods.getItems().call({from:accounts[0]});
+            items = value;
+
+            refreshMarket();
+        }
+
+        // 사용자 계좌(계정) 등록 버튼
+        async function registerClicked() {
+            const value = await contractInstance.methods.register().send({from:accounts[0]});
+            resultbox.innerHTML = "등록 " + value;
+        }
+
+        // 사용자 계정에 보유중인 물건 확인 버튼
+        async function itemCheckClicked() {
+            const value = await contractInstance.methods.checkItem().call({from:accounts[0]});
+            if(value.length == 0)
+                resultbox.innerHTML = "없음";
+            else
+                resultbox.innerHTML = value;
+        }
+
+        // 사용자 계정이 보유중인 물건의 개수 확인 버튼
+        async function itemNumberClicked() {
+            const itemName = document.getElementById("item_name_own").value;
+            const value = await contractInstance.methods.getItemNumber(itemName).call({from:accounts[0]});
+            alert(value);
+            resultbox.innerHTML = value;
+        }
+
+        // 사용자 계정에 물건 등록 버튼
+        async function registerItemClicked() {
+            const itemName = document.getElementById("item_name").value;
+            const itemNum = document.getElementById("item_num").value;
+            alert(itemName);
+            const value = await contractInstance.methods.registerItem(itemName, itemNum).send({from:accounts[0]});
+            resultbox.innerHTML = value;
+        }
+    </script>
+
+</body>
+
+</html>
